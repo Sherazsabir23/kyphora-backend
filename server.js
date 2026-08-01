@@ -7,8 +7,8 @@ const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const authRoute= require("./routes/auth.route.js");
 const passwordRoutes = require("./routes/password.route.js");
-
-
+const noteRoutes = require("./routes/note.route");
+const cardRoutes = require("./routes/card.routes");
 const app = express();
 
 // -------------------- Middlewares --------------------
@@ -41,6 +41,8 @@ mongoose
 
 app.use("/api", authRoute);
 app.use("/api/passwords", passwordRoutes);
+app.use("/api/notes", noteRoutes);
+app.use("/api/cards", cardRoutes);
 //server
 const PORT = process.env.PORT || 5000;
 

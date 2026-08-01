@@ -24,6 +24,14 @@ exports.createPassword = async (req, res) => {
       });
     }
 
+    // Generate favicon
+    const domain = website
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .split("/")[0];
+
+    const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+
     const vaultItem = await Password.create({
       user: req.user.id,
       title,
@@ -34,6 +42,7 @@ exports.createPassword = async (req, res) => {
       notes,
       favorite,
       passwordStrength: checkPasswordStrength(password),
+      favicon,
     });
 
     return res.status(201).json({
@@ -98,6 +107,7 @@ exports.getPasswords = async (req, res) => {
       title: item.title,
       website: item.website,
       username: item.username,
+      favicon: item.favicon,
       category: item.category,
       notes: item.notes,
       favorite: item.favorite,
@@ -191,7 +201,19 @@ exports.updatePassword = async (req, res) => {
     } = req.body;
 
     if (title !== undefined) passwordDoc.title = title;
-    if (website !== undefined) passwordDoc.website = website;
+
+    // Update website + favicon
+    if (website !== undefined) {
+      passwordDoc.website = website;
+
+      const domain = website
+        .replace(/^https?:\/\//, "")
+        .replace(/^www\./, "")
+        .split("/")[0];
+
+      passwordDoc.favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+    }
+
     if (username !== undefined) passwordDoc.username = username;
     if (category !== undefined) passwordDoc.category = category;
     if (notes !== undefined) passwordDoc.notes = notes;
@@ -218,7 +240,6 @@ exports.updatePassword = async (req, res) => {
     });
   }
 };
-
 // =========================
 // Delete Password
 // =========================
