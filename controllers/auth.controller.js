@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 const User = require("../models/user.model.js");
 const generateOTP = require("../utils/generateOTP");
@@ -8,6 +7,9 @@ const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const { jwtAuthMiddleware ,generateToken} = require("../middleware/jwt.middleware");
+const getDeviceInfo = require("../utils/deviceInfo"); // NEW
+const logActivity = require("../utils/logActivity"); // NEW
+const { verify2FAToken } = require("../utils/twoFactor"); // NEW
 // Register User
 const register = async (req, res) => {
   try {
@@ -314,6 +316,23 @@ const login = async (req, res) => {
       });
     }
 
+    // NEW: If 2FA is enabled, don't log the user in yet — issue a short-lived
+    // challenge token instead. The real session is created in verify2FALogin.
+    if (user.twoFactorEnabled) {
+      const twoFactorToken = jwt.sign(
+        { id: user._id, stage: "2fa_pending", rememberMe: !!rememberMe },
+        process.env.JWT_SECRET,
+        { expiresIn: "5m" }
+      );
+
+      return res.status(200).json({
+        success: true,
+        twoFactorRequired: true,
+        twoFactorToken,
+        message: "Enter your two-factor authentication code to continue.",
+      });
+    }
+
     // JWT Payload
     const payload = {
       id: user._id,
@@ -341,6 +360,17 @@ const login = async (req, res) => {
         : 24 * 60 * 60 * 1000,
     });
 
+    // Log this login as an activity entry
+    const { device, location, ip } = getDeviceInfo(req); // NEW
+    await logActivity({ // NEW
+      userId: user._id,
+      type: "Login",
+      title: `Login from ${device.replace(" · ", ", ")}`,
+      device,
+      location,
+      ip,
+    });
+
     // Remove sensitive fields
     const userData = user.toObject();
 
@@ -357,6 +387,103 @@ const login = async (req, res) => {
 
   } catch (error) {
     console.log("Login Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
+// NEW: Completes login after a 2FA challenge (see login() above)
+const verify2FALogin = async (req, res) => {
+  try {
+    const { twoFactorToken, token } = req.body;
+
+    if (!twoFactorToken || !token) {
+      return res.status(400).json({
+        success: false,
+        message: "Two-factor token and code are required.",
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(twoFactorToken, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({
+        success: false,
+        message: "Two-factor session expired. Please log in again.",
+      });
+    }
+
+    if (decoded.stage !== "2fa_pending") {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid two-factor session.",
+      });
+    }
+
+    const user = await User.findById(decoded.id).select("+twoFactorSecret");
+
+    if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+      return res.status(400).json({
+        success: false,
+        message: "Two-factor authentication is not enabled for this account.",
+      });
+    }
+
+    const isValid = verify2FAToken(token, user.twoFactorSecret);
+
+    if (!isValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid verification code.",
+      });
+    }
+
+    const rememberMe = !!decoded.rememberMe;
+
+    const payload = {
+      id: user._id,
+      email: user.email,
+      tokenVersion: user.tokenVersion,
+    };
+
+    const authToken = generateToken(payload, rememberMe);
+
+    res.cookie("token", authToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000,
+    });
+
+    const { device, location, ip } = getDeviceInfo(req);
+    await logActivity({
+      userId: user._id,
+      type: "Login",
+      title: `Login from ${device.replace(" · ", ", ")}`,
+      device,
+      location,
+      ip,
+    });
+
+    const userData = user.toObject();
+    delete userData.password;
+    delete userData.emailVerificationCode;
+    delete userData.emailVerificationExpires;
+    delete userData.tokenVersion;
+    delete userData.twoFactorSecret;
+    delete userData.twoFactorTempSecret;
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      user: userData,
+    });
+  } catch (error) {
+    console.log("Verify 2FA Login Error:", error);
 
     return res.status(500).json({
       success: false,
@@ -559,6 +686,17 @@ const resetPassword = async (req, res) => {
 
     await user.save();
 
+    // Log this as a Security Event (master password changed)
+    const { device, location, ip } = getDeviceInfo(req); // NEW
+    await logActivity({ // NEW
+      userId: user._id,
+      type: "Security Events",
+      title: "Master password changed",
+      device,
+      location,
+      ip,
+    });
+
     return res.status(200).json({
       success: true,
       message: "Password reset successfully.",
@@ -654,6 +792,7 @@ module.exports = {
     register,
     verifyEmail,
     login,
+    verify2FALogin,
     getMe,
     logout,
     forgotPassword,

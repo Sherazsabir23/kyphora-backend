@@ -9,7 +9,13 @@ const authRoute= require("./routes/auth.route.js");
 const passwordRoutes = require("./routes/password.route.js");
 const noteRoutes = require("./routes/note.route");
 const cardRoutes = require("./routes/card.routes");
+const apiRoutes = require("./routes/apiKeyRoutes");
+const documentRoutes = require("./routes/document.routes");
+const securityRoutes = require ("./routes/security.routes")
+const settingRoutes =  require("./routes/settings.routes.js")
+const activityRoutes = require("./routes/activity.routes.js")
 const app = express();
+
 
 // -------------------- Middlewares --------------------
 app.use(helmet());
@@ -20,7 +26,7 @@ app.use(
     credentials: true,
   })
 );
-
+app.use("/uploads", express.static("uploads"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -43,6 +49,11 @@ app.use("/api", authRoute);
 app.use("/api/passwords", passwordRoutes);
 app.use("/api/notes", noteRoutes);
 app.use("/api/cards", cardRoutes);
+app.use("/api/api-keys",apiRoutes);
+app.use("/api/documents", documentRoutes);
+app.use("/api/security",securityRoutes );
+app.use("/api/activity", activityRoutes);
+app.use("/api/settings",settingRoutes);
 //server
 const PORT = process.env.PORT || 5000;
 

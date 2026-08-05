@@ -1,5 +1,6 @@
 const crypto = require("crypto");
-
+const fs = require("fs");
+const path = require("path");
 const ALGORITHM = "aes-256-cbc";
 
 // 32-byte key
@@ -40,7 +41,67 @@ const decrypt = (encryptedText) => {
   return decrypted;
 };
 
+const encryptFile = async (inputPath) => {
+  const iv = crypto.randomBytes(16);
+
+  const cipher = crypto.createCipheriv(
+    ALGORITHM,
+    SECRET_KEY,
+    iv
+  );
+
+  const outputPath = `${inputPath}.enc`;
+
+  return new Promise((resolve, reject) => {
+    const input = fs.createReadStream(inputPath);
+    const output = fs.createWriteStream(outputPath);
+
+    // Save IV as first 16 bytes
+    output.write(iv);
+
+    input
+      .pipe(cipher)
+      .pipe(output);
+
+    output.on("finish", () => {
+      fs.unlinkSync(inputPath); // delete original file
+      resolve(outputPath);
+    });
+
+    output.on("error", reject);
+  });
+};
+
+const decryptFile = async (inputPath, outputPath) => {
+  return new Promise((resolve, reject) => {
+    const input = fs.createReadStream(inputPath);
+
+    let iv;
+
+    input.once("readable", () => {
+      iv = input.read(16);
+
+      const decipher = crypto.createDecipheriv(
+        ALGORITHM,
+        SECRET_KEY,
+        iv
+      );
+
+      const output = fs.createWriteStream(outputPath);
+
+      input
+        .pipe(decipher)
+        .pipe(output);
+
+      output.on("finish", resolve);
+
+      output.on("error", reject);
+    });
+  });
+};
 module.exports = {
   encrypt,
   decrypt,
+  encryptFile,
+  decryptFile
 };

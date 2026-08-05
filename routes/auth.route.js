@@ -1,5 +1,5 @@
 const express = require("express");
-const { register, verifyEmail,resendVerificationCode,resetPassword,forgotPassword, login, getMe , logout } = require("../controllers/auth.controller.js");
+const { register, verifyEmail,resendVerificationCode,resetPassword,forgotPassword,verify2FALogin, login, getMe , logout } = require("../controllers/auth.controller.js");
 const { jwtAuthMiddleware } = require("../middleware/jwt.middleware.js")
 const router = express.Router();
 
@@ -17,4 +17,5 @@ router.post("/auth/resend-verification", resendVerificationCode);
 router.post("/auth/logout", logout);
 router.post("/auth/forgot-password", forgotPassword);
 router.post("/auth/reset-password/:token", resetPassword);
+router.post("/verify-2fa",verify2FALogin);
 module.exports = router;

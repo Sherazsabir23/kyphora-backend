@@ -64,7 +64,23 @@ const userSchema = new mongoose.Schema(
         tokenVersion:{
             type:Number,
             default:0,
-        }
+        },
+
+        // NEW: Two-Factor Authentication (TOTP)
+        twoFactorEnabled: {
+            type: Boolean,
+            default: false,
+        },
+        twoFactorSecret: {
+            type: String,
+            default: null,
+            select: false,
+        },
+        twoFactorTempSecret: {
+            type: String,
+            default: null,
+            select: false,
+        },
     },
     {
         timestamps: true,

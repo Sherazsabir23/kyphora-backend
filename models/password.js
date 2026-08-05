@@ -33,6 +33,13 @@ const passwordSchema = new mongoose.Schema(
       required: true,
     },
 
+    // NEW: SHA-256 hash of the plaintext password, used ONLY to detect
+    // reuse across a user's vault without decrypting everything.
+    passwordHash: {
+      type: String,
+      index: true,
+    },
+
     category: {
       type: String,
       enum: ["Work", "Personal", "Finance", "Social", "Other"],

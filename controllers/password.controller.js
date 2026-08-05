@@ -1,6 +1,9 @@
 const Password = require("../models/Password");
 const { encrypt, decrypt } = require("../utils/encryption");
 const checkPasswordStrength = require("../utils/passwordStrength");
+const hashPassword = require("../utils/passwordHash"); // NEW
+const getDeviceInfo = require("../utils/deviceInfo"); // NEW
+const logActivity = require("../utils/logActivity"); // NEW
 
 // =========================
 // Create Password
@@ -38,11 +41,22 @@ exports.createPassword = async (req, res) => {
       website,
       username,
       encryptedPassword: encrypt(password),
+      passwordHash: hashPassword(password), // NEW
       category,
       notes,
       favorite,
       passwordStrength: checkPasswordStrength(password),
       favicon,
+    });
+
+    const { device, location, ip } = getDeviceInfo(req);
+    await logActivity({
+      userId: req.user.id,
+      type: "Vault Changes",
+      title: `Added new password — ${title}`,
+      device,
+      location,
+      ip,
     });
 
     return res.status(201).json({
@@ -221,10 +235,21 @@ exports.updatePassword = async (req, res) => {
 
     if (password) {
       passwordDoc.encryptedPassword = encrypt(password);
+      passwordDoc.passwordHash = hashPassword(password); // NEW
       passwordDoc.passwordStrength = checkPasswordStrength(password);
     }
 
     await passwordDoc.save();
+
+    const { device, location, ip } = getDeviceInfo(req);
+    await logActivity({
+      userId: req.user.id,
+      type: "Vault Changes",
+      title: `Updated vault item — ${passwordDoc.title}`,
+      device,
+      location,
+      ip,
+    });
 
     return res.status(200).json({
       success: true,
@@ -262,6 +287,16 @@ exports.deletePassword = async (req, res) => {
     }
 
     await password.deleteOne();
+
+    const { device, location, ip } = getDeviceInfo(req);
+    await logActivity({
+      userId: req.user.id,
+      type: "Vault Changes",
+      title: `Deleted vault item — ${password.title}`,
+      device,
+      location,
+      ip,
+    });
 
     return res.status(200).json({
       success: true,
