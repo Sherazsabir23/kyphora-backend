@@ -1,7 +1,7 @@
 const express = require("express");
 
 const router = express.Router();
-
+const upload = require("../utils/upload");
 const { jwtAuthMiddleware } = require("../middleware/jwt.middleware.js");
 
 const {
@@ -18,7 +18,7 @@ const {
 router.use(jwtAuthMiddleware);
 
 router.put("/profile", updateProfile);
-router.put("/avatar", updateAvatar);
+router.put("/avatar", upload.single("avatar"), updateAvatar);
 router.put("/password", updateMasterPassword);
 
 router.post("/2fa/setup", setup2FA);

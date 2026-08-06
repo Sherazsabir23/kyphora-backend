@@ -51,19 +51,19 @@ exports.updateProfile = async (req, res) => {
 };
 
 // =========================
-// Update Avatar (expects an already-hosted URL, e.g. from your upload flow)
+// Update Avatar (uploaded file via multer middleware — see route)
 // =========================
 exports.updateAvatar = async (req, res) => {
   try {
-    const { avatar } = req.body;
-
-    if (!avatar) {
-      return res.status(400).json({ success: false, message: "Avatar URL is required." });
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file uploaded." });
     }
+
+    const avatarUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { avatar },
+      { avatar: avatarUrl },
       { new: true }
     );
 
@@ -113,6 +113,7 @@ exports.updateMasterPassword = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, 12);
     // Invalidate any existing sessions/tokens on other devices
     user.tokenVersion += 1;
+    user.tokenVersionUpdatedAt = new Date(); // NEW
     await user.save();
 
     const { device, location, ip } = getDeviceInfo(req);
@@ -186,7 +187,7 @@ exports.verify2FASetup = async (req, res) => {
       });
     }
 
-    const isValid = verify2FAToken(token, user.twoFactorTempSecret);
+    const isValid = await verify2FAToken(token, user.twoFactorTempSecret);
     if (!isValid) {
       return res.status(400).json({ success: false, message: "Invalid verification code." });
     }
@@ -267,6 +268,7 @@ exports.logoutAllDevices = async (req, res) => {
     }
 
     user.tokenVersion += 1;
+    user.tokenVersionUpdatedAt = new Date(); // NEW
     await user.save();
 
     res.clearCookie("token", {

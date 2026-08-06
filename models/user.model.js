@@ -65,6 +65,12 @@ const userSchema = new mongoose.Schema(
             type:Number,
             default:0,
         },
+        // NEW: timestamp of the last tokenVersion bump (logout-all / password
+        // change). Logins before this are on invalidated tokens.
+        tokenVersionUpdatedAt: {
+            type: Date,
+            default: Date.now,
+        },
 
         // NEW: Two-Factor Authentication (TOTP)
         twoFactorEnabled: {

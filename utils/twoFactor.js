@@ -1,21 +1,28 @@
-const { authenticator } = require("otplib");
+const { generateSecret, generateURI, verify } = require("otplib");
 const QRCode = require("qrcode");
 
+// otplib v13 API (complete rewrite from v12's `authenticator` object) —
+// generateSecret/generateURI are sync, verify is async and returns
+// { valid: boolean }, not a plain boolean.
+
 // Generates a new base32 secret + a scannable QR code data URL for it.
-// The label (email) and issuer show up in the user's authenticator app.
 const generate2FASecret = async (email) => {
-  const secret = authenticator.generateSecret();
-  const otpauthUrl = authenticator.keyuri(email, "Kyphora", secret);
+  const secret = generateSecret();
+  const otpauthUrl = generateURI({
+    issuer: "Kyphora",
+    label: email,
+    secret,
+  });
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
 
   return { secret, qrCodeDataUrl };
 };
 
-// Verifies a 6-digit code against a stored secret. Allows a small
-// time-drift window by default (otplib default is +/- 1 step = 30s).
-const verify2FAToken = (token, secret) => {
+// Verifies a 6-digit code against a stored secret.
+const verify2FAToken = async (token, secret) => {
   try {
-    return authenticator.verify({ token, secret });
+    const result = await verify({ secret, token });
+    return result.valid;
   } catch (err) {
     return false;
   }

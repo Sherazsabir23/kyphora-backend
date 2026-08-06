@@ -433,7 +433,7 @@ const verify2FALogin = async (req, res) => {
       });
     }
 
-    const isValid = verify2FAToken(token, user.twoFactorSecret);
+    const isValid = await verify2FAToken(token, user.twoFactorSecret);
 
     if (!isValid) {
       return res.status(401).json({

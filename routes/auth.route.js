@@ -17,5 +17,5 @@ router.post("/auth/resend-verification", resendVerificationCode);
 router.post("/auth/logout", logout);
 router.post("/auth/forgot-password", forgotPassword);
 router.post("/auth/reset-password/:token", resetPassword);
-router.post("/verify-2fa",verify2FALogin);
+router.post("/auth/verify-2fa",verify2FALogin);
 module.exports = router;
