@@ -12,8 +12,9 @@ const cardRoutes = require("./routes/card.routes");
 const apiRoutes = require("./routes/apiKeyRoutes");
 const documentRoutes = require("./routes/document.routes");
 const securityRoutes = require ("./routes/security.routes")
-const settingRoutes =  require("./routes/settings.routes.js")
-const activityRoutes = require("./routes/activity.routes.js")
+const settingRoutes =  require("./routes/settings.routes")
+const activityRoutes = require("./routes/activity.routes")
+const dashboardRoutes = require("./routes/dashboard.routes")
 const app = express();
 
 
@@ -58,6 +59,7 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/security",securityRoutes );
 app.use("/api/activity", activityRoutes);
 app.use("/api/settings",settingRoutes);
+app.use("/api/dashboard",dashboardRoutes);
 //server
 const PORT = process.env.PORT || 5000;
 
