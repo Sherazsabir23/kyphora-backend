@@ -17,7 +17,8 @@ const activityRoutes = require("./routes/activity.routes")
 const dashboardRoutes = require("./routes/dashboard.routes")
 const app = express();
 
-
+const dns = require("dns");
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 // -------------------- Middlewares --------------------
 app.use(
   helmet({
