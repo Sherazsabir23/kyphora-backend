@@ -1,4 +1,4 @@
-const Password = require("../models/Password");
+const Password = require("../models/password");
 
 // =========================
 // Get Security Overview

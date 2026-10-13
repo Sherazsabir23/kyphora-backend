@@ -1,4 +1,4 @@
-const Password = require("../models/Password");
+const Password = require("../models/password");
 const { encrypt, decrypt } = require("../utils/encryption");
 const checkPasswordStrength = require("../utils/passwordStrength");
 const hashPassword = require("../utils/passwordHash"); // NEW
