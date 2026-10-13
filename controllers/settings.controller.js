@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/user.model.js");
-const Password = require("../models/Password");
+const Password = require("../models/Password.js");
 const Card = require("../models/Card");
 const Note = require("../models/Note");
 const Document = require("../models/document.model.js");

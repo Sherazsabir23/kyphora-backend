@@ -1,9 +1,9 @@
-const Password = require("../models/Password");
+const Password = require("../models/Password.js");
 const Card = require("../models/Card");
 const Note = require("../models/Note");
 const ApiKey = require("../models/ApiKey");
 const Document = require("../models/document.model.js"); // verify this filename matches your project
-const ActivityLog = require("../models/ActivityLog");
+const ActivityLog = require("../models/Activitylog");
 const User = require("../models/user.model.js");
 
 // =========================
