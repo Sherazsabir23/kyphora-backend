@@ -1,7 +1,7 @@
 const Password = require("../models/password");
 const { encrypt, decrypt } = require("../utils/encryption");
 const checkPasswordStrength = require("../utils/passwordStrength");
-const hashPassword = require("../utils/passwordHash"); // NEW
+const hashPassword = require("../utils/passwordhash"); // NEW
 const getDeviceInfo = require("../utils/deviceInfo"); // NEW
 const logActivity = require("../utils/logActivity"); // NEW
 
