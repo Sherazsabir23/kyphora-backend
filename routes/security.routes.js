@@ -4,7 +4,7 @@ const router = express.Router();
 
 const { jwtAuthMiddleware } = require("../middleware/jwt.middleware.js");
 
-const { getSecurityOverview } = require("../controllers/security.controller");
+const { getSecurityOverview } = require("../controllers/Security.controller.js");
 
 router.use(jwtAuthMiddleware);
 
