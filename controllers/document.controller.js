@@ -6,6 +6,30 @@ const {
   encryptFile,
   decryptFile,
 } = require("../utils/encryption");
+const {
+  uploadToCloud,
+  downloadFromCloud,
+  deleteFromCloud,
+  removeLocal,
+} = require("../utils/cloudStorage");
+
+
+// ======================================
+// Helper: file type
+// ======================================
+
+const getFileType = (mimetype) => {
+  if (mimetype === "application/pdf") return "PDF";
+  if (mimetype.startsWith("image/")) return "Image";
+  if (
+    mimetype.includes("sheet") ||
+    mimetype.includes("excel") ||
+    mimetype.includes("spreadsheet")
+  ) {
+    return "Spreadsheet";
+  }
+  return "File";
+};
 
 
 // ======================================
@@ -13,6 +37,8 @@ const {
 // ======================================
 
 exports.uploadDocument = async (req, res) => {
+  let encryptedPath;
+
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -22,35 +48,28 @@ exports.uploadDocument = async (req, res) => {
     }
 
     // Encrypt uploaded file
-    const encryptedPath = await encryptFile(req.file.path);
+    encryptedPath = await encryptFile(req.file.path);
 
-   let type = "File";
+    // Upload encrypted file to Cloudinary
+    const cloudUrl = await uploadToCloud(encryptedPath);
 
-if (req.file.mimetype === "application/pdf") {
-  type = "PDF";
-} else if (req.file.mimetype.startsWith("image/")) {
-  type = "Image";
-} else if (
-  req.file.mimetype.includes("sheet") ||
-  req.file.mimetype.includes("excel") ||
-  req.file.mimetype.includes("spreadsheet")
-) {
-  type = "Spreadsheet";
-}
+    const type = getFileType(req.file.mimetype);
 
-const document = await Document.create({
-  user: req.user.id,
+    const document = await Document.create({
+      user: req.user.id,
 
-  name: req.file.originalname,
+      name: req.file.originalname,
 
-  originalName: req.file.originalname,
-  mimetype: req.file.mimetype, 
-  filePath: encryptedPath,
+      originalName: req.file.originalname,
+      mimetype: req.file.mimetype,
+      filePath: cloudUrl,
 
-  type,
+      type,
 
-  size: `${(req.file.size / 1024 / 1024).toFixed(2)} MB`,
-});
+      size: `${(req.file.size / 1024 / 1024).toFixed(2)} MB`,
+    });
+
+    removeLocal(req.file.path, encryptedPath);
 
     res.status(201).json({
       success: true,
@@ -59,6 +78,8 @@ const document = await Document.create({
     });
   } catch (error) {
     console.error(error);
+
+    if (req.file) removeLocal(req.file.path, encryptedPath);
 
     res.status(500).json({
       success: false,
@@ -146,17 +167,23 @@ exports.downloadDocument = async (req, res) => {
       });
     }
 
+    const encTemp = path.join("uploads", `enc-${Date.now()}.enc`);
     const tempPath = path.join(
       "uploads",
       `temp-${Date.now()}-${document.name}`
     );
 
-    await decryptFile(document.filePath, tempPath);
+    try {
+      // Cloudinary se encrypted file utaro, phir decrypt karo
+      await downloadFromCloud(document.filePath, encTemp);
+      await decryptFile(encTemp, tempPath);
+    } catch (err) {
+      removeLocal(encTemp, tempPath);
+      throw err;
+    }
 
     res.download(tempPath, document.name, () => {
-      if (fs.existsSync(tempPath)) {
-        fs.unlinkSync(tempPath);
-      }
+      removeLocal(tempPath, encTemp);
     });
   } catch (error) {
     console.error(error);
@@ -168,11 +195,14 @@ exports.downloadDocument = async (req, res) => {
   }
 };
 
+
 // ======================================
 // Update Document
 // ======================================
 
 exports.updateDocument = async (req, res) => {
+  let encryptedPath;
+
   try {
     const document = await Document.findOne({
       _id: req.params.id,
@@ -180,6 +210,8 @@ exports.updateDocument = async (req, res) => {
     });
 
     if (!document) {
+      if (req.file) removeLocal(req.file.path);
+
       return res.status(404).json({
         success: false,
         message: "Document not found.",
@@ -187,39 +219,30 @@ exports.updateDocument = async (req, res) => {
     }
 
     if (req.file) {
-
-      // Delete old encrypted file
-
-      if (fs.existsSync(document.filePath)) {
-  fs.unlinkSync(document.filePath);
-}
+      const oldUrl = document.filePath;
 
       // Encrypt new uploaded file
+      encryptedPath = await encryptFile(req.file.path);
 
-      const encryptedPath = await encryptFile(req.file.path);
+      // Upload new encrypted file to Cloudinary
+      const cloudUrl = await uploadToCloud(encryptedPath);
 
-     let type = "File";
+      removeLocal(req.file.path, encryptedPath);
 
-if (req.file.mimetype === "application/pdf") {
-  type = "PDF";
-} else if (req.file.mimetype.startsWith("image/")) {
-  type = "Image";
-} else if (
-  req.file.mimetype.includes("sheet") ||
-  req.file.mimetype.includes("excel") ||
-  req.file.mimetype.includes("spreadsheet")
-) {
-  type = "Spreadsheet";
-}
+      document.name = req.file.originalname;
+      document.originalName = req.file.originalname;
+      document.mimetype = req.file.mimetype;
+      document.filePath = cloudUrl;
+      document.type = getFileType(req.file.mimetype);
+      document.size = `${(req.file.size / 1024 / 1024).toFixed(2)} MB`;
 
-document.name = req.file.originalname;
-document.originalName = req.file.originalname;
-document.filePath = encryptedPath;
-document.type = type;
-document.size = `${(req.file.size / 1024 / 1024).toFixed(2)} MB`;
+      await document.save();
+
+      // Purani file Cloudinary se delete (save ke baad, taake fail hone par data na jaye)
+      await deleteFromCloud(oldUrl);
+    } else {
+      await document.save();
     }
-
-    await document.save();
 
     res.status(200).json({
       success: true,
@@ -228,6 +251,8 @@ document.size = `${(req.file.size / 1024 / 1024).toFixed(2)} MB`;
     });
   } catch (error) {
     console.error(error);
+
+    if (req.file) removeLocal(req.file.path, encryptedPath);
 
     res.status(500).json({
       success: false,
@@ -255,9 +280,7 @@ exports.deleteDocument = async (req, res) => {
       });
     }
 
-    if (fs.existsSync(document.filePath)) {
-      fs.unlinkSync(document.filePath);
-    }
+    await deleteFromCloud(document.filePath);
 
     await document.deleteOne();
 
@@ -275,6 +298,11 @@ exports.deleteDocument = async (req, res) => {
   }
 };
 
+
+// ======================================
+// Preview Document
+// ======================================
+
 exports.previewDocument = async (req, res) => {
   try {
     const document = await Document.findOne({
@@ -289,19 +317,24 @@ exports.previewDocument = async (req, res) => {
       });
     }
 
+    const encTemp = path.join("uploads", `enc-${Date.now()}.enc`);
     const tempPath = path.join(
       "uploads",
       `preview-${Date.now()}-${document.originalName}`
     );
 
-    await decryptFile(document.filePath, tempPath);
+    try {
+      await downloadFromCloud(document.filePath, encTemp);
+      await decryptFile(encTemp, tempPath);
+    } catch (err) {
+      removeLocal(encTemp, tempPath);
+      throw err;
+    }
 
     res.setHeader("Content-Disposition", "inline");
 
-    res.sendFile(path.resolve(tempPath), (err) => {
-      if (fs.existsSync(tempPath)) {
-        fs.unlinkSync(tempPath);
-      }
+    res.sendFile(path.resolve(tempPath), () => {
+      removeLocal(tempPath, encTemp);
     });
   } catch (error) {
     console.error(error);

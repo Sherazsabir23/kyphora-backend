@@ -8,7 +8,11 @@ const ApiKey = require("../models/ApiKey");
 const { generate2FASecret, verify2FAToken } = require("../utils/twoFactor");
 const getDeviceInfo = require("../utils/deviceInfo");
 const logActivity = require("../utils/logActivity");
-
+const {
+  uploadImageToCloud,
+  deleteFromCloud,
+  removeLocal,
+} = require("../utils/cloudStorage");
 // =========================
 // Update Profile (name/email)
 // =========================
@@ -50,22 +54,37 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// =========================
-// Update Avatar (uploaded file via multer middleware — see route)
-// =========================
 exports.updateAvatar = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No file uploaded." });
     }
 
-    const avatarUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    if (!req.file.mimetype.startsWith("image/")) {
+      removeLocal(req.file.path);
+      return res.status(400).json({ success: false, message: "Please upload an image file." });
+    }
+
+    const existingUser = await User.findById(req.user.id).select("avatar");
+    if (!existingUser) {
+      removeLocal(req.file.path);
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    const oldAvatar = existingUser.avatar;
+
+    // Cloudinary par upload, phir local file delete
+    const avatarUrl = await uploadImageToCloud(req.file.path);
+    removeLocal(req.file.path);
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
       { avatar: avatarUrl },
       { new: true }
     );
+
+    // Purana avatar Cloudinary se delete (local ya dusre URL par kuch nahi karega)
+    await deleteFromCloud(oldAvatar);
 
     return res.status(200).json({
       success: true,
@@ -74,6 +93,7 @@ exports.updateAvatar = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    if (req.file) removeLocal(req.file.path);
     return res.status(500).json({ success: false, message: "Failed to update avatar." });
   }
 };
@@ -309,6 +329,13 @@ exports.deleteAccount = async (req, res) => {
     }
 
     const userId = user._id;
+// Cloudinary se user ki saari files delete (documents + avatar)
+const userDocs = await Document.find({ user: userId }).select("filePath");
+await Promise.allSettled([
+  ...userDocs.map((d) => deleteFromCloud(d.filePath)),
+  deleteFromCloud(user.avatar),
+]);
+
 
     await Promise.all([
       Password.deleteMany({ user: userId }),
