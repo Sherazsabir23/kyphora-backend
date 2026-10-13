@@ -3,7 +3,7 @@ const Card = require("../models/Card");
 const Note = require("../models/Note");
 const ApiKey = require("../models/ApiKey");
 const Document = require("../models/document.model.js"); // verify this filename matches your project
-const ActivityLog = require("../models/Activitylog");
+const ActivityLog = require("../models/Activitylog.js");
 const User = require("../models/user.model.js");
 
 // =========================
