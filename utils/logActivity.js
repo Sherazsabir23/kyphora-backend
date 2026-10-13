@@ -1,4 +1,4 @@
-const ActivityLog = require("../models/ActivityLog");
+const ActivityLog = require("../models/Activitylog");
 
 /**
  * Writes one activity log entry. Never throws — a logging failure
